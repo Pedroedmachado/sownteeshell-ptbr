@@ -22,8 +22,6 @@ cd ~/Dotfiles/sownteeshell-ptbr
 ./instalar-sownteeshell.sh
 ```
 
-O repositório é privado: no Arch, entre com `gh auth login` ou use uma chave SSH antes de clonar.
-
 O script pergunta antes de: instalar o OCR, ativar o locale `pt_BR.UTF-8` (sudo) e trocar sua config do Niri.
 Se preferir manter sua config do Niri como está, rode `./instalar-sownteeshell.sh --sem-niri` e ele mostra as linhas para colar.
 
@@ -100,6 +98,6 @@ rm -rf ~/.config/niri && mv ~/.config/niri.backup-<data> ~/.config/niri
 
 ## Observações
 
-- É o setup pessoal do autor e o repositório não tem licença: use para você, não redistribua.
+- A SownteeShell é o setup pessoal do [sownteedev](https://github.com/sownteedev/dotfiles) e não tem licença; este repositório só traz o kit de instalação e a tradução.
 - Não instala: zsh como shell padrão, teclado vietnamita, greetd, tema do GRUB, Steam/Wallpaper Engine, Tailscale, WARP, Howdy. Os pacotes estão no instalador do autor (branch `install`) se quiser algum.
 - O ícone padrão é o WhiteSur; para usar outro, defina `QS_ICON_THEME` ou mude o tema de ícones do GTK.
