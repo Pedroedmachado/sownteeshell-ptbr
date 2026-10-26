@@ -1,85 +1,90 @@
-# SownteeShell em pt-BR para Arch + Niri
+# SownteeShell em pt-BR para Arch + Niri (desktop)
 
-Kit para instalar a [SownteeShell](https://github.com/sownteedev/dotfiles/tree/sownteeshell) traduzida para português.
+Kit para deixar o Arch igual ao vídeo da [SownteeShell](https://github.com/sownteedev/dotfiles/tree/sownteeshell), traduzida para português e ajustada para PC de mesa (NVIDIA, sem bateria, monitor externo, teclado ABNT2).
 
-## O que tem aqui
-
-| Arquivo | Para quê |
-|---|---|
-| `instalar-sownteeshell.sh` | Instala tudo: pacotes, código, tradução, serviços e (se você aceitar) a config do Niri |
-| `atualizar-sownteeshell.sh` | Puxa a versão nova do autor, reaplica a tradução e recompila |
-| `aplicar-ptbr.py` | Só aplica a tradução e os ajustes regionais num checkout já existente |
-| `configurar-niri.py` | Troca sua config do Niri pela estrutura que a SownteeShell espera (com backup) |
-| `traducao-ptbr.json` | Dicionário com as ~1950 frases traduzidas. Edite aqui se quiser mudar algum texto |
-
-## Instalação
+## Instalar ou consertar
 
 Dentro da sessão do Niri, num terminal:
 
 ```bash
-git clone https://github.com/Pedroedmachado/sownteeshell-ptbr.git ~/Dotfiles/sownteeshell-ptbr
-cd ~/Dotfiles/sownteeshell-ptbr
-./instalar-sownteeshell.sh
+git clone https://github.com/Pedroedmachado/sownteeshell-ptbr.git ~/Dotfiles/sownteeshell-ptbr 2>/dev/null || git -C ~/Dotfiles/sownteeshell-ptbr pull
+~/Dotfiles/sownteeshell-ptbr/instalar-sownteeshell.sh
 ```
 
-O script pergunta antes de: instalar o OCR, ativar o locale `pt_BR.UTF-8` (sudo) e trocar sua config do Niri.
-Se preferir manter sua config do Niri como está, rode `./instalar-sownteeshell.sh --sem-niri` e ele mostra as linhas para colar.
+Serve para instalar do zero **e** para consertar uma instalação que já existe (feita com o instalador do autor ou com a versão antiga deste kit). Ele pergunta no começo quais extras você quer (Enter aceita a opção em maiúscula). No fim mostra a conferência e pede para **sair e entrar de novo** na sessão.
 
-Antes de testar, tire do seu `config.kdl` o que a SownteeShell substitui: Waybar, mako/dunst/swaync, fuzzel/wofi, swaylock, swaybg/hyprpaper. Depois rode `~/Dotfiles/sownteeshell/run-sownteeshell` ou saia e entre no Niri.
+## Conferir o que está funcionando
 
-Os arquivos ficam em `~/Dotfiles/sownteeshell` e `~/Dotfiles/dotf` porque vários caminhos do autor apontam para lá.
+```bash
+~/Dotfiles/sownteeshell-ptbr/verificar-sownteeshell.sh
+```
 
-## O que a config do Niri faz
+Mostra cada função do vídeo com ✓, ✗ (com o comando que resolve) ou – (opcional). Não muda nada no sistema.
 
-- Guarda a sua em `~/.config/niri.backup-<data>`.
-- Copia a estrutura do autor (`config.kdl` + `include/*.kdl`), que o painel de Configurações do shell sabe editar.
-- Mantém seus monitores (blocos `output`) e o layout de teclado (ou `br` se não achar).
-- Remove o teclado vietnamita (fcitx5), as variáveis da NVIDIA se você não tiver NVIDIA, e o `xwayland-satellite` duplicado no Niri ≥ 25.08.
-- Troca o terminal e o gerenciador de arquivos pelos que você tem instalados.
-- Roda `niri validate`; se der erro, restaura a sua config original.
+## O que estava quebrado e foi corrigido
+
+| Problema | Causa | Correção |
+|---|---|---|
+| Opções do Niri, Atalhos, Layout, Entrada, Animações, Regras e **Tela** não faziam nada | O painel edita `~/Dotfiles/dotf/.config/niri`, mas o kit antigo copiava a config para `~/.config/niri` | `~/.config/niri` agora é um link para a pasta do dotf; os ajustes do PC são feitos lá |
+| Seletor de papel de parede vazio | A tradução mudou a pasta para `~/Imagens/Wallpapers`, que ficava vazia | O instalador copia os papéis de parede do autor para lá e corrige a configuração salva |
+| Adicionar conta na Agenda falhava | Faltava chaveiro (Secret Service); o do KDE saiu junto com o Plasma | Instala o gnome-keyring e destrava no login |
+| Troca de cores travando às vezes | Ganchos do Matugen chamam programas do autor (Steam Adwaita, VS Code) | Ganchos protegidos com `|| true` |
+| Botões Tailscale, WARP, Wallpaper Engine, Workshop, login Wallhaven/Steam, rosto | Pacotes e serviços opcionais não instalados | O instalador pergunta e instala cada um |
+| Steam e apps X11 sem abrir | `DISPLAY ":1"` fixo na config do autor | Removido; o Niri define sozinho |
+| Teclado americano, fcitx5 vietnamita | Config do notebook do autor | Layout ABNT2 (ou o seu), sem fcitx5 |
+| Super+Enter / Super+E sem abrir nada | Apontavam para `blackbox-terminal` e `nautilus` | Apontam para os que você tem; o Nautilus é instalado |
+| Atalhos "SownteeShell Configurações/Agenda" sem abrir | `~/.local/bin` fora do PATH da sessão | Adicionado em `~/.config/environment.d` |
+| Dias da previsão em inglês | Lista fixa no código | Dom, Seg, Ter… |
+| Eventos do Outlook somem | Fuso de Brasília não estava no mapa da Microsoft | Adicionados os fusos do Brasil |
+| Uso alto de VRAM na NVIDIA | Problema conhecido do driver com compositores | Perfil da NVIDIA para Niri e Quickshell |
+
+## Extras que o instalador pergunta
+
+- **Wallpaper Engine + Workshop**: instala Steam, steamcmd e linux-wallpaperengine. Você precisa ter o Wallpaper Engine na sua conta Steam e instalá-lo uma vez pela Steam (com Proton) para baixar os assets.
+- **Login no Wallhaven/Steam**: pyside6 + qt6-webengine, para coleções e inscrições dentro das Configurações.
+- **Tailscale** e **Cloudflare WARP**: botões dos controles rápidos. No Tailscale, rode `sudo tailscale up` uma vez.
+- **Desbloqueio por rosto (Howdy)**: só aparece se houver webcam. Compila por um tempo.
+- **Sunshine**: streaming do PC.
+- **Tela de login da SownteeShell (greetd)**: troca o gerenciador de login atual. Para voltar: `sudo systemctl enable --force sddm` (ou o que você usava).
+- **Tema do autor nos apps** (GTK/Qt, ícones WhiteSur, cursor, fonte SF Pro).
+
+## Depois de instalar
+
+Em **Super+I → Integrações**:
+- **Clima**: chave grátis em openweathermap.org (API → "Current weather" e "5 day forecast") e *Detectar localização* (ou digite, ex.: `-23.55,-46.63`).
+- **KLIPY**: chave para GIFs (`g`) e figurinhas (`s`) no inicializador.
+- **Wallhaven / Steam**: usuário e chave, se quiser coleções e Workshop.
+
+### Agenda Google
+
+A Agenda pede **o seu próprio** ID de cliente OAuth (o autor não distribui o dele):
+
+1. Abra console.cloud.google.com, crie um projeto.
+2. *APIs e serviços → Biblioteca*: ative **Google Calendar API** e **Google Tasks API**.
+3. *Tela de permissão OAuth*: tipo **Externo**, adicione seu e-mail como usuário de teste.
+4. *Credenciais → Criar credenciais → ID do cliente OAuth → App para computador*.
+5. Na Agenda da SownteeShell: *Adicionar conta → Google*, cole o **ID do cliente** e a **chave secreta**.
+
+Microsoft/Outlook é igual, com um "App registration" no portal do Azure (cliente público, redirecionamento `http://localhost`). iCloud usa CalDAV com senha de app.
 
 ## Atalhos principais
 
 | Atalho | Ação |
 |---|---|
-| Alt+Espaço | Inicializador (prefixos: `f` arquivos, `c` área de transferência, `=` calculadora, `e` emoji) |
+| Alt+Espaço | Inicializador (`f` arquivos, `c` área de transferência, `=` calculadora, `e` emoji, `g` GIF, `s` figurinhas) |
 | Super+I | Configurações |
 | Super+L | Bloquear tela |
 | Super+M | Papéis de parede |
 | Super+Shift+S | Captura de tela com editor |
-| Super+Shift+R | Iniciar/parar gravação de tela |
+| Super+Shift+R | Iniciar/parar gravação |
 | Ctrl+Alt+R | Recarregar o shell |
-| Super+Enter | Terminal |
-| Super+E | Arquivos |
-| Alt+F4 | Fechar janela (sem janela aberta: menu de energia) |
+| Super+Enter / Super+E | Terminal / Arquivos |
+| Alt+F4 | Fechar janela (sem janela: menu de energia) |
 | Super+O | Visão geral |
-| Super+1…9 / Super+Shift+1…9 | Ir para / mover para a área de trabalho |
-| Alt+←/→ | Focar coluna |
-| Super+V / Super+F | Flutuante / tela cheia |
-| Super+Shift+/ | Mostrar todos os atalhos |
+| Super+Shift+V | Área de trabalho flutuante |
+| Super+Shift+/ | Todos os atalhos |
 
-Todos estão em `~/.config/niri/include/keybinds.kdl` e podem ser editados em Configurações → Niri → Atalhos.
-
-## Ajustes regionais aplicados
-
-- Interface inteira em português (barra, painéis, inicializador, Configurações, captura, notificações, calendário, tela de bloqueio). A busca das Configurações também aceita termos em português.
-- Meses e datas em português (via `LC_TIME=pt_BR.UTF-8`).
-- Iniciais da semana S T Q Q S S D.
-- Clima com descrições em português (OpenWeather `lang=pt_br`).
-- OCR em português + inglês (`tesseract-data-por`) no lugar do vietnamita.
-- Calendário lunar vietnamita desligado por padrão (o botão continua no calendário).
-- Teclado ABNT2 na tela de login quando o locale é pt_BR.
-- Papéis de parede em `~/Imagens/Wallpapers` (e `.../live` para vídeos).
-- Atualizações do sistema funcionam com `paru` além de `yay`.
-
-## Depois de instalar
-
-Em Configurações → Integrações coloque, se quiser:
-- chave da OpenWeather (clima na barra e no painel esquerdo);
-- chave da KLIPY (GIFs e figurinhas no inicializador);
-- conta Google (Agenda e Tarefas).
-
-Configurações → Avançado → Dependências mostra o que está faltando no seu sistema.
+Todos editáveis em Configurações → Niri → Atalhos.
 
 ## Atualizar
 
@@ -87,17 +92,29 @@ Configurações → Avançado → Dependências mostra o que está faltando no s
 cd ~/Dotfiles/sownteeshell-ptbr && git pull && ./atualizar-sownteeshell.sh
 ```
 
-Isso guarda a tradução antiga num `git stash`, puxa a versão nova, reaplica a tradução e recompila os serviços. Frases que o autor adicionar depois vão aparecer em inglês até entrarem no `traducao-ptbr.json`.
+Puxa a versão nova do autor, reaplica a tradução, recompila os serviços (e a tela de login, se instalada). Frases novas do autor aparecem em inglês até entrarem no `traducao-ptbr.json`.
+
+## Arquivos
+
+| Arquivo | Para quê |
+|---|---|
+| `instalar-sownteeshell.sh` | Instala ou conserta tudo |
+| `verificar-sownteeshell.sh` | Confere função por função |
+| `atualizar-sownteeshell.sh` | Atualiza e reaplica o pt-BR |
+| `configurar-niri.py` | Liga `~/.config/niri` ao dotf e faz os ajustes de desktop (com backup e `niri validate`) |
+| `aplicar-ptbr.py` | Tradução e ajustes regionais |
+| `traducao-ptbr.json` | As frases traduzidas |
 
 ## Desfazer
 
 ```bash
 systemctl --user disable --now sownteeshell-core sownteeshell-calendar
-rm -rf ~/.config/niri && mv ~/.config/niri.backup-<data> ~/.config/niri
+rm ~/.config/niri && mv ~/.config/niri.backup-<data> ~/.config/niri   # se existir backup
 ```
 
 ## Observações
 
 - A SownteeShell é o setup pessoal do [sownteedev](https://github.com/sownteedev/dotfiles) e não tem licença; este repositório só traz o kit de instalação e a tradução.
-- Não instala: zsh como shell padrão, teclado vietnamita, greetd, tema do GRUB, Steam/Wallpaper Engine, Tailscale, WARP, Howdy. Os pacotes estão no instalador do autor (branch `install`) se quiser algum.
-- O ícone padrão é o WhiteSur; para usar outro, defina `QS_ICON_THEME` ou mude o tema de ícones do GTK.
+- Não instala: zsh, teclado vietnamita, tema do GRUB, apps pessoais do autor (VS Code, VMware, Zalo...).
+- Funções de notebook (bateria, limite de carga, tampa) ficam escondidas sozinhas num desktop.
+- Brilho pelo painel usa DDC/CI: ative no menu do monitor. TVs geralmente não têm.

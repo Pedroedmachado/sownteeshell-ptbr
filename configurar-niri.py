@@ -1,118 +1,254 @@
 #!/usr/bin/env python3
-"""Instala a estrutura de config do Niri da SownteeShell (config.kdl + include/*.kdl),
-guardando a sua config atual em ~/.config/niri.backup-<data>.
+"""Deixa a config do Niri do jeito que a SownteeShell espera, adaptada para desktop.
 
-Mantém da sua config antiga: os blocos `output` (monitores) e o layout de teclado.
-Remove o que é do setup do autor e não serve aqui: teclado vietnamita (fcitx5),
-variáveis da NVIDIA quando não há NVIDIA, xwayland-satellite duplicado.
-Se `niri validate` reclamar, restaura a config antiga e sai com erro.
+Por que existe: o painel de Configurações (Niri, Atalhos, Layout, Entrada, Animações,
+Regras, Tela) e o Rust Core editam SEMPRE ~/Dotfiles/dotf/.config/niri. Se
+~/.config/niri for uma cópia, nenhuma dessas opções faz efeito. Então:
+
+  1. ~/.config/niri vira um link para ~/Dotfiles/dotf/.config/niri (a antiga vai para backup);
+  2. os ajustes deste PC são feitos dentro de ~/Dotfiles/dotf/.config/niri:
+     - monitores: mantém os seus (da config antiga ou do Niri em execução);
+     - teclado: layout da config antiga, do `localectl` ou "br" (ABNT2);
+     - tira o teclado vietnamita (fcitx5) e o DISPLAY fixo ":1";
+     - variáveis da NVIDIA só se houver NVIDIA;
+     - não inicia xwayland-satellite à mão no Niri >= 25.08 (o Niri já inicia);
+     - Super+Enter / Super+E apontam para o terminal e o gerenciador de arquivos instalados.
+  3. `niri validate`; se falhar, tudo volta como estava.
+
+Pode rodar quantas vezes quiser.
+Uso: configurar-niri.py [pasta-dotf]   (padrão: ~/Dotfiles/dotf)
 """
-import os, re, shutil, subprocess, sys, time
+import json, re, shutil, subprocess, sys, time
 from pathlib import Path
 
-SRC = Path(sys.argv[1]).expanduser()
-DST = Path("~/.config/niri").expanduser()
+HOME = Path.home()
+DOTF = Path(sys.argv[1]).expanduser() if len(sys.argv) > 1 else HOME / "Dotfiles/dotf"
+SRC = DOTF / ".config/niri"
+INC = SRC / "include"
+DST = HOME / ".config/niri"
 TS = time.strftime("%Y%m%d-%H%M%S")
-BAK = DST.with_name(f"niri.backup-{TS}")
+ASSINATURA_AUTOR = "California Institute of Technology"
 
-def tem(cmd): return shutil.which(cmd) is not None
+if not (SRC / "config.kdl").is_file() or not INC.is_dir():
+    sys.exit(f"[!] Não achei {SRC}/config.kdl. Rode o instalador primeiro (ele clona o dotf).")
 
-# ---- lê a config antiga (config.kdl + includes)
-antigo = ""
-if DST.exists():
-    for p in sorted(DST.resolve().rglob("*.kdl")):
-        try: antigo += "\n" + p.read_text(encoding="utf-8")
-        except OSError: pass
+def tem(cmd):
+    return shutil.which(cmd) is not None
+
+def rodar(*cmd):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+def ler_kdl(pasta):
+    texto = ""
+    if pasta and pasta.exists():
+        arquivos = [pasta] if pasta.is_file() else sorted(pasta.rglob("*.kdl"))
+        for p in arquivos:
+            try:
+                texto += "\n" + p.read_text(encoding="utf-8")
+            except OSError:
+                pass
+    return texto
+
+def sem_comentarios(texto):
+    return "\n".join(l for l in texto.split("\n") if not l.strip().startswith("//"))
 
 def blocos(texto, nome):
+    texto = sem_comentarios(texto)
     out, i = [], 0
     for m in re.finditer(r'^\s*' + nome + r'\b[^{\n]*\{', texto, re.M):
-        if m.start() < i: continue
+        if m.start() < i:
+            continue
         prof, j = 0, m.end() - 1
         while j < len(texto):
-            if texto[j] == "{": prof += 1
+            if texto[j] == "{":
+                prof += 1
             elif texto[j] == "}":
                 prof -= 1
-                if prof == 0: break
+                if prof == 0:
+                    break
             j += 1
-        out.append(texto[m.start():j + 1].strip()); i = j + 1
+        out.append(texto[m.start():j + 1].strip())
+        i = j + 1
     return out
 
-saidas = [b for b in blocos(antigo, "output") if not b.lstrip().startswith("//")]
-lay = re.search(r'^\s*layout\s+"([^"]+)"', antigo, re.M)
-var = re.search(r'^\s*variant\s+"([^"]*)"', antigo, re.M)
-opt = re.search(r'^\s*options\s+"([^"]*)"', antigo, re.M)
+# ------------------------------------------------------------ config antiga
+link_ok = DST.is_symlink() and DST.resolve() == SRC.resolve()
+antigo = ""
+if DST.exists() and not link_ok:
+    antigo = ler_kdl(DST.resolve() if DST.is_symlink() else DST)
+# backups de execuções anteriores deste kit (que copiavam em vez de linkar)
+backups = sorted(HOME.joinpath(".config").glob("niri.backup-*"), reverse=True)
 
-# ---- backup e cópia
-if DST.is_symlink():
-    DST.rename(BAK)
-elif DST.exists():
-    shutil.move(str(DST), str(BAK))
-shutil.copytree(SRC, DST, symlinks=False)
-inc = DST / "include"
+# ------------------------------------------------------------ backup do dotf
+BAK_DOTF = HOME / f".config/niri-dotf.backup-{TS}"
+shutil.copytree(SRC, BAK_DOTF, symlinks=True)
+BAK_DST = None
+
+def restaurar(msg):
+    shutil.rmtree(SRC)
+    shutil.copytree(BAK_DOTF, SRC, symlinks=True)
+    if BAK_DST is not None:
+        if DST.is_symlink() or DST.exists():
+            DST.unlink() if DST.is_symlink() else shutil.rmtree(DST)
+        BAK_DST.rename(DST)
+    sys.exit(msg)
+
+# ------------------------------------------------------------ link ~/.config/niri
+if not link_ok:
+    if DST.is_symlink() or DST.exists():
+        BAK_DST = HOME / f".config/niri.backup-{TS}"
+        DST.rename(BAK_DST)
+    DST.parent.mkdir(parents=True, exist_ok=True)
+    DST.symlink_to(SRC)
 
 def editar(nome, fn):
-    p = inc / nome
-    p.write_text(fn(p.read_text(encoding="utf-8")), encoding="utf-8")
+    p = INC / nome
+    if not p.is_file():
+        return
+    t = p.read_text(encoding="utf-8")
+    t2 = fn(t)
+    if t2 != t:
+        p.write_text(t2, encoding="utf-8")
 
-# monitores
-(inc / "outputs.kdl").write_text(
-    ("\n\n".join(saidas) + "\n") if saidas else
-    "// Seus monitores. Ajuste em Configurações > Tela da SownteeShell ou veja `niri msg outputs`.\n",
-    encoding="utf-8")
+# ------------------------------------------------------------ monitores
+saidas_atuais = (INC / "outputs.kdl").read_text(encoding="utf-8") if (INC / "outputs.kdl").is_file() else ""
+monitores_msg = "mantidos"
+if ASSINATURA_AUTOR in saidas_atuais or not blocos(saidas_atuais, "output"):
+    fontes = [antigo] + [ler_kdl(b) for b in backups]
+    saidas = []
+    for f in fontes:
+        saidas = [b for b in blocos(f, "output") if ASSINATURA_AUTOR not in b]
+        if saidas:
+            break
+    if not saidas:
+        r = rodar("niri", "msg", "-j", "outputs")
+        if r and r.returncode == 0:
+            try:
+                dados = json.loads(r.stdout)
+            except ValueError:
+                dados = {}
+            for nome, o in sorted(dados.items(), key=lambda kv: (kv[1].get("logical") or {}).get("x", 0)):
+                lg = o.get("logical") or {}
+                modo = None
+                idx = o.get("current_mode")
+                if idx is not None and o.get("modes"):
+                    m = o["modes"][idx]
+                    modo = f'{m["width"]}x{m["height"]}@{m["refresh_rate"] / 1000:.3f}'
+                linhas = [f'output "{nome}" {{']
+                if modo:
+                    linhas.append(f'    mode "{modo}"')
+                linhas.append(f'    scale {lg.get("scale", 1.0)}')
+                linhas.append(f'    position x={lg.get("x", 0)} y={lg.get("y", 0)}')
+                linhas.append("}")
+                saidas.append("\n".join(linhas))
+    (INC / "outputs.kdl").write_text(
+        ("\n\n".join(saidas) + "\n") if saidas else
+        "// Monitores: o Niri detecta sozinho. Ajuste em Configurações > Tela.\n",
+        encoding="utf-8")
+    monitores_msg = f"{len(saidas)} configurado(s)" if saidas else "automático"
 
-# teclado
-def teclado(t):
-    linhas = [f'            layout "{lay.group(1) if lay else "br"}"']
-    if var and var.group(1): linhas.append(f'            variant "{var.group(1)}"')
-    if opt and opt.group(1): linhas.append(f'            options "{opt.group(1)}"')
-    return t.replace('            // layout "us,vi"', "\n".join(linhas), 1)
-editar("input.kdl", teclado)
+# ------------------------------------------------------------ teclado
+def achar_layout():
+    for f in [antigo] + [ler_kdl(b) for b in backups]:
+        f = sem_comentarios(f)
+        m = re.search(r'(?<![\w-])layout\s+"([^"]+)"', f, re.M)
+        if m:
+            v = re.search(r'\bvariant\s+"([^"]*)"', f, re.M)
+            o = re.search(r'\boptions\s+"([^"]*)"', f, re.M)
+            return m.group(1), v.group(1) if v else "", o.group(1) if o else ""
+    r = rodar("localectl", "status")
+    if r and r.returncode == 0:
+        m = re.search(r'X11 Layout:\s*(\S+)', r.stdout)
+        v = re.search(r'X11 Variant:\s*(\S+)', r.stdout)
+        if m:
+            return m.group(1), v.group(1) if v else "", ""
+    return "br", "", ""
 
-# variáveis de ambiente
-nvidia = False
-try:
-    nvidia = "nvidia" in subprocess.run(["lspci"], capture_output=True, text=True).stdout.lower()
-except OSError: pass
+atual_inc = sem_comentarios((INC / "input.kdl").read_text(encoding="utf-8"))
+ja_tem = re.search(r'(?<![\w-])layout\s+"([^"]+)"', atual_inc, re.M)
+if ja_tem and ja_tem.group(1) not in ("us,vi", "vi"):
+    teclado_msg = f"{ja_tem.group(1)} (mantido)"
+else:
+    lay, var, opt = achar_layout()
+    if lay in ("us,vi", "vi"):
+        lay, var = "br", ""
+    def teclado(t):
+        novas = [f'            layout "{lay}"']
+        if var:
+            novas.append(f'            variant "{var}"')
+        if opt:
+            novas.append(f'            options "{opt}"')
+        # troca a linha do layout do autor (comentada) ou um layout vietnamita
+        t2, n = re.subn(r'^[ \t]*//\s*layout\s+"us,vi"[ \t]*$', "\n".join(novas), t, count=1, flags=re.M)
+        if n == 0:
+            t2, n = re.subn(r'^[ \t]*layout\s+"(?:us,vi|vi)"[ \t]*$', "\n".join(novas), t, count=1, flags=re.M)
+        if n == 0:
+            t2 = re.sub(r'(xkb\s*\{)', r'\1\n' + "\n".join(novas), t, count=1)
+        return t2
+    editar("input.kdl", teclado)
+    teclado_msg = lay + (f" ({var})" if var else "")
+
+# ------------------------------------------------------------ versão do Niri / GPU
+r = rodar("niri", "--version")
+v = re.search(r'(\d+)\.(\d+)', r.stdout if r else "")
+niri_ver = (int(v.group(1)), int(v.group(2))) if v else (0, 0)
+r = rodar("lspci")
+nvidia = bool(r) and bool(re.search(r'(vga|3d|display).*nvidia', r.stdout, re.I))
+
+# ------------------------------------------------------------ ambiente
 def ambiente(t):
-    fora = ["QT_IM_MODULE", "XMODIFIERS", "SDL_IM_MODULE", "GLFW_IM_MODULE", "INPUT_METHOD", "DISPLAY "]
-    if not nvidia: fora += ["GBM_BACKEND", "__GLX_VENDOR_LIBRARY_NAME"]
-    if not tem("qt6ct"): fora += ["QT_QPA_PLATFORMTHEME"]
+    fora = ["QT_IM_MODULE", "XMODIFIERS", "SDL_IM_MODULE", "GLFW_IM_MODULE", "INPUT_METHOD"]
+    if niri_ver >= (25, 8) or niri_ver == (0, 0):
+        fora.append("DISPLAY ")
+    if not nvidia:
+        fora += ["GBM_BACKEND", "__GLX_VENDOR_LIBRARY_NAME"]
+    if not tem("qt6ct"):
+        fora.append("QT_QPA_PLATFORMTHEME")
     return "\n".join(l for l in t.split("\n") if not any(l.strip().startswith(f) for f in fora))
 editar("environment.kdl", ambiente)
 
-# autostart
-try:
-    v = re.search(r'(\d+)\.(\d+)', subprocess.run(["niri", "--version"], capture_output=True, text=True).stdout)
-    niri_ver = (int(v.group(1)), int(v.group(2))) if v else (0, 0)
-except OSError: niri_ver = (0, 0)
+# ------------------------------------------------------------ autostart
 def autostart(t):
     out = []
     for l in t.split("\n"):
-        if "fcitx5" in l: continue
-        if '"xwayland-satellite"' in l and niri_ver >= (25, 8): continue  # o Niri já inicia sozinho
-        if "gnome-keyring-daemon" in l and not tem("gnome-keyring-daemon"): continue
+        if "fcitx5" in l and not l.strip().startswith("//"):
+            continue
+        if '"xwayland-satellite"' in l and niri_ver >= (25, 8):
+            continue
         out.append(l)
     return "\n".join(out)
 editar("autostart.kdl", autostart)
 
-# terminal e gerenciador de arquivos
-term = next((c for c in ("blackbox-terminal", "ghostty", "kitty", "alacritty", "foot", "wezterm", "konsole", "gnome-terminal") if tem(c)), None)
-fm = next((c for c in ("nautilus", "thunar", "dolphin", "nemo", "pcmanfm-qt", "pcmanfm") if tem(c)), None)
+# ------------------------------------------------------------ terminal e arquivos
+TERMS = ("blackbox-terminal", "ghostty", "kitty", "alacritty", "foot", "wezterm", "konsole", "gnome-terminal", "ptyxis")
+FMS = ("nautilus", "thunar", "dolphin", "nemo", "pcmanfm-qt", "pcmanfm")
+term = next((c for c in TERMS if tem(c)), None)
+fm = next((c for c in FMS if tem(c)), None)
 def binds(t):
-    if term: t = t.replace('spawn "blackbox-terminal"', f'spawn "{term}"')
-    if fm: t = t.replace('spawn "nautilus"', f'spawn "{fm}"')
-    else: t = "\n".join(l for l in t.split("\n") if 'spawn "nautilus"' not in l)
+    if term:
+        t = re.sub(r'(Mod\+Return[^\n]*\{\s*spawn\s+)"[^"]+"', r'\1"' + term + '"', t, count=1)
+    if fm:
+        t = re.sub(r'(Mod\+E\s[^\n]*\{\s*spawn\s+)"[^"]+"', r'\1"' + fm + '"', t, count=1)
     return t
 editar("keybinds.kdl", binds)
 
-# ---- valida
-r = subprocess.run(["niri", "validate", "-c", str(DST / "config.kdl")], capture_output=True, text=True)
-if r.returncode != 0:
-    print(r.stdout + r.stderr, file=sys.stderr)
-    shutil.rmtree(DST)
-    if BAK.exists(): BAK.rename(DST)
-    sys.exit("[!] O Niri recusou a config nova (versão antiga do Niri?). A sua config original foi restaurada.")
+# ------------------------------------------------------------ valida
+if tem("niri"):
+    r = rodar("niri", "validate", "-c", str(SRC / "config.kdl"))
+    if r is None or r.returncode != 0:
+        print((r.stdout + r.stderr) if r else "niri validate não rodou", file=sys.stderr)
+        restaurar("[!] O Niri recusou a config ajustada. Tudo foi restaurado como estava.")
 
-print(f"[ok] Config do Niri instalada. A antiga está em {BAK}")
-print(f"     Teclado: {lay.group(1) if lay else 'br'} · Monitores copiados: {len(saidas)} · Terminal: {term or 'blackbox-terminal (não instalado)'}")
+# remove o backup do dotf se nada mudou
+if ler_kdl(BAK_DOTF) == ler_kdl(SRC):
+    shutil.rmtree(BAK_DOTF)
+    bak_msg = ""
+else:
+    bak_msg = f" · backup: {BAK_DOTF}"
+
+print(f"[ok] Niri: ~/.config/niri -> {SRC}" + (f" (antiga em {BAK_DST})" if BAK_DST else ""))
+print(f"     Teclado: {teclado_msg} · Monitores: {monitores_msg} · Terminal: {term or 'nenhum'} · Arquivos: {fm or 'nenhum'}"
+      f" · NVIDIA: {'sim' if nvidia else 'não'}{bak_msg}")

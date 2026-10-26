@@ -171,5 +171,39 @@ patch("scripts/system/package-updates.sh",
       "        yay --sudo /usr/bin/sudo",
       '        "$(command -v yay || command -v paru)" --sudo /usr/bin/sudo')
 
+# Dias da previsão do tempo (o original usa uma lista fixa em inglês).
+patch("service/productivity/WeatherService.qml",
+      'var days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];',
+      'var days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];')
+
+# Botões "Editar"/"Excluir" das notificações de captura continuam coloridos em pt-BR.
+p = ROOT / "widget/notification/NotificationPopups.qml"
+if p.is_file():
+    t = p.read_text(encoding="utf-8")
+    t2 = t.replace('modelData.text === "Edit" ?', '(modelData.text === "Edit" || modelData.text === "Editar") ?') \
+          .replace('modelData.text === "Delete" ?', '(modelData.text === "Delete" || modelData.text === "Excluir") ?')
+    if t2 != t:
+        p.write_text(t2, encoding="utf-8")
+
+# Agenda da Microsoft: fuso de Brasília nos dois sentidos (sem isso os eventos
+# vindos do Outlook com "E. South America Standard Time" não são lidos).
+patch("backend/rust/calendar-daemon/src/providers/microsoft.rs",
+      '        "America/New_York" => "Eastern Standard Time".to_string(),\n',
+      '        "America/Sao_Paulo" | "America/Bahia" | "America/Fortaleza" | "America/Recife"\n'
+      '        | "America/Belem" | "America/Maceio" | "America/Araguaina" => {\n'
+      '            "E. South America Standard Time".to_string()\n'
+      '        }\n'
+      '        "America/Cuiaba" | "America/Campo_Grande" => "Central Brazilian Standard Time".to_string(),\n'
+      '        "America/Manaus" | "America/Porto_Velho" | "America/Boa_Vista" => {\n'
+      '            "SA Western Standard Time".to_string()\n'
+      '        }\n'
+      '        "America/New_York" => "Eastern Standard Time".to_string(),\n')
+patch("backend/rust/calendar-daemon/src/providers/microsoft.rs",
+      '        "Eastern Standard Time" => "America/New_York",\n',
+      '        "E. South America Standard Time" => "America/Sao_Paulo",\n'
+      '        "Central Brazilian Standard Time" => "America/Cuiaba",\n'
+      '        "SA Western Standard Time" => "America/Manaus",\n'
+      '        "Eastern Standard Time" => "America/New_York",\n')
+
 MARCA.write_text("pt-BR aplicado\n")
 print(f"[ok] Tradução aplicada em {alterados} arquivos de {ROOT}")
