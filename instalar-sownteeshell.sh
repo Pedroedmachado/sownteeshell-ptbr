@@ -73,7 +73,7 @@ azul "[*] NVIDIA: $NVIDIA · Intel: $INTEL · Webcam: $CAMERA · Bluetooth: $BLU
 # ------------------------------------------------------------------ escolhas
 echo
 azul "Funções opcionais do vídeo (Enter = resposta em maiúscula):"
-Q_WE=0; Q_CONTAS=0; Q_TAIL=0; Q_WARP=0; Q_HOWDY=0; Q_SUN=0; Q_GREET=0; Q_TEMA=0; Q_NIRI=0
+Q_WE=0; Q_CONTAS=0; Q_TAIL=0; Q_WARP=0; Q_HOWDY=0; Q_SUN=0; Q_GREET=0; Q_TEMA=0; Q_TERM=0; Q_ZSH=0; Q_NIRI=0
 pergunta "  Papéis de parede animados do Wallpaper Engine + Steam Workshop (precisa ter o Wallpaper Engine na Steam)?" S && Q_WE=1
 pergunta "  Login no Wallhaven/Steam dentro das Configurações (coleções, inscrições)?" S && Q_CONTAS=1
 pergunta "  Botão do Tailscale nos controles rápidos?" S && Q_TAIL=1
@@ -88,6 +88,11 @@ else
     pergunta "  Tela de login da SownteeShell (greetd) no lugar da atual? Troca o gerenciador de login." N && Q_GREET=1
 fi
 pergunta "  Tema do autor em apps GTK/Qt (cores do papel de parede, ícones WhiteSur, cursor, fonte SF Pro)?" S && Q_TEMA=1
+pergunta "  Terminal do vídeo (Blackbox com as cores do papel de parede, fonte GeistMono, Super+Enter)?" S && Q_TERM=1
+if [ "$Q_TERM" -eq 1 ]; then
+    if [ "$SIM_TUDO" -eq 1 ]; then Q_ZSH=1
+    else pergunta "    Usar o zsh do autor como shell padrão (prompt, autocompletar, eza/bat/fzf)?" S && Q_ZSH=1; fi
+fi
 if [ "$SEM_NIRI" -eq 0 ]; then
     pergunta "  Ajustar a config do Niri (necessário para as opções do Niri e da Tela funcionarem)?" S && Q_NIRI=1
 fi
@@ -123,7 +128,10 @@ if [ "$Q_TEMA" -eq 1 ]; then
     instalado qt6ct || PACOTES+=(qt6ct-kde)
     instalado qt5ct || PACOTES+=(qt5ct-kde)
 fi
-if ! tem blackbox-terminal && ! tem kitty && ! tem ghostty && ! tem alacritty && ! tem foot && ! tem wezterm && ! tem konsole; then
+if [ "$Q_TERM" -eq 1 ]; then
+    PACOTES+=(blackbox-terminal)
+    [ "$Q_ZSH" -eq 1 ] && PACOTES+=(zsh eza bat fzf chafa)
+elif ! tem kitty && ! tem ghostty && ! tem alacritty && ! tem foot && ! tem wezterm && ! tem konsole; then
     PACOTES+=(blackbox-terminal)
 fi
 # Extras: cada grupo instala separado; se um falhar (build do AUR quebrado), o resto continua.
@@ -268,7 +276,40 @@ if [ "$Q_TEMA" -eq 1 ]; then
         gsettings set org.gnome.desktop.interface font-name 'SF Pro Text 10.5' || true
     fi
     gsettings set org.gnome.desktop.wm.preferences button-layout ':minimize,maximize,close' || true
+    # Cursor também nos apps X11 (Steam etc.)
+    mkdir -p "$HOME/.icons/default"
+    printf '[Icon Theme]\nInherits=Dark_Cursor\n' > "$HOME/.icons/default/index.theme"
     fc-cache -f >/dev/null 2>&1 || true
+fi
+
+# ------------------------------------------------------------------ 5b. terminal
+if [ "$Q_TERM" -eq 1 ] && tem blackbox-terminal; then
+    azul "[*] Configurando o Blackbox como no vídeo..."
+    mkdir -p "$HOME/.local/share/blackbox/schemes"
+    B=com.raggesilver.BlackBox
+    gsettings set $B cursor-shape 1 || true
+    gsettings set $B easy-copy-paste true || true
+    gsettings set $B font 'GeistMono Nerd Font 11' || true
+    gsettings set $B pretty true || true
+    gsettings set $B style-preference 0 || true
+    gsettings set $B terminal-cell-height 1.25 || true
+    gsettings set $B terminal-padding '(uint32 30, uint32 30, uint32 30, uint32 30)' || true
+    gsettings set $B theme-bold-is-bright true || true
+    gsettings set $B theme-dark 'Custom' || true
+    gsettings set $B theme-light 'Custom' || true
+    # Terminal padrão das Configurações da SownteeShell
+    SET="${XDG_CACHE_HOME:-$HOME/.cache}/sownteeshell/settings.json"
+    if [ -f "$SET" ]; then
+        python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["defaultTerminal"]="blackbox-terminal"; json.dump(d,open(p,"w"),indent=4)' "$SET" || true
+    fi
+fi
+if [ "$Q_ZSH" -eq 1 ] && tem zsh; then
+    ligar "$DOTF_DIR/.config/zsh" "$HOME/.config/zsh"
+    grep -qF 'source "$HOME/.config/zsh/.zshrc"' "$HOME/.zshrc" 2>/dev/null || \
+        printf '%s\n' 'source "$HOME/.config/zsh/.zshrc"' >> "$HOME/.zshrc"
+    if [ "$(getent passwd "$USER" | cut -d: -f7)" != /usr/bin/zsh ]; then
+        sudo chsh -s /usr/bin/zsh "$USER" && azul "[*] zsh virou o shell padrão (vale no próximo terminal). Voltar: sudo chsh -s /bin/bash $USER"
+    fi
 fi
 
 # Pastas onde o Matugen grava as cores (GTK, Qt, Kvantum, Vesktop...) precisam existir.
@@ -418,6 +459,16 @@ fi
 # ------------------------------------------------------------------ 9. Niri
 if [ "$Q_NIRI" -eq 1 ]; then
     python3 "$KIT/configurar-niri.py" "$DOTF_DIR" || erro "Config do Niri não foi alterada (veja a mensagem acima)."
+fi
+
+# ------------------------------------------------------------------ 9b. primeiras cores
+# Sem isso Qt/Kvantum/Blackbox ficam sem tema até trocar o papel de parede pela primeira vez.
+if [ ! -f "$SHELL_DIR/colors.json" ] && tem matugen; then
+    azul "[*] Gerando as cores iniciais a partir do papel de parede padrão..."
+    "$DOTF_DIR/.config/matugen/scripts/prepare-gtk-runtime.sh" >/dev/null 2>&1 || true
+    "$SHELL_DIR/scripts/theme/matugen-wallpaper-theme.sh" --config "$DOTF_DIR/.config/matugen/config.toml" \
+        --mode dark --quiet "$DOTF_DIR/.walls/flower-plant-petal.jpg" >/dev/null 2>&1 || \
+        erro "Não gerou as cores agora; escolha um papel de parede em Super+M."
 fi
 
 # ------------------------------------------------------------------ 10. conferência

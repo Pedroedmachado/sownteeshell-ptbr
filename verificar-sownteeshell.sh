@@ -211,5 +211,31 @@ if lspci 2>/dev/null | grep -Ei 'vga|3d' | grep -qi nvidia; then
 fi
 
 # ------------------------------------------------------------------
+secao "Terminal, cursor e tema dos apps"
+if tem blackbox-terminal; then
+    ok "Terminal Blackbox"
+    [ "$(gsettings get com.raggesilver.BlackBox theme-dark 2>/dev/null)" = "'Custom'" ] && ok "  Blackbox usando as cores do papel de parede" || \
+        falha "  Blackbox sem o tema Custom" "$KIT_CMD (responda s no terminal)"
+    [ -f "$HOME/.local/share/blackbox/schemes/custom.json" ] && ok "  Esquema de cores do Blackbox gerado" || \
+        falha "  Esquema do Blackbox não gerado" "escolha um papel de parede em Super+M"
+else opc "Blackbox (terminal do vídeo) não instalado" "rode o instalador e responda s em 'Terminal do vídeo'"; fi
+fc-list 2>/dev/null | grep -qi 'GeistMono Nerd' && ok "Fonte GeistMono Nerd (terminal)" || falha "Falta a fonte do terminal" "paru -S otf-geist-mono-nerd"
+if [ "$(getent passwd "$USER" | cut -d: -f7)" = /usr/bin/zsh ]; then
+    [ -e "$HOME/.config/zsh/.zshrc" ] && ok "zsh do autor" || falha "zsh sem a config do autor" "$KIT_CMD"
+else opc "Shell padrão não é o zsh do vídeo" "opcional: rode o instalador e responda s no zsh"; fi
+CUR="$(grep -Eo 'xcursor-theme\s+"[^"]+"' "$DOTF_DIR/.config/niri/include/cursor.kdl" 2>/dev/null | cut -d'"' -f2)"
+if [ -n "$CUR" ] && { [ -d "$HOME/.icons/$CUR" ] || [ -d "/usr/share/icons/$CUR" ] || [ -d "$HOME/.local/share/icons/$CUR" ]; }; then
+    ok "Cursor $CUR no Niri"
+else falha "Cursor '${CUR:-?}' do Niri não está instalado (aparece o cursor padrão)" "$KIT_CMD (responda s no tema)"; fi
+[ "$(gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null)" = "'${CUR:-Dark_Cursor}'" ] && ok "Cursor nos apps GTK" || \
+    falha "Cursor dos apps GTK diferente do Niri" "gsettings set org.gnome.desktop.interface cursor-theme '${CUR:-Dark_Cursor}'"
+grep -qs "Inherits=${CUR:-Dark_Cursor}" "$HOME/.icons/default/index.theme" && ok "Cursor nos apps X11 (Steam)" || \
+    falha "Apps X11 com cursor padrão" "$KIT_CMD"
+[ -f "$HOME/.config/Kvantum/matugen/matugen.kvconfig" ] && ok "Tema Qt (Kvantum) com as cores do papel de parede" || \
+    falha "Tema Qt ainda não gerado" "escolha um papel de parede em Super+M"
+[ -f "$HOME/.config/gtk-4.0/colors.css" ] && ok "Tema GTK com as cores do papel de parede" || \
+    falha "Cores GTK ainda não geradas" "escolha um papel de parede em Super+M"
+
+# ------------------------------------------------------------------
 printf '\n\033[1mResumo:\033[0m \033[32m%d ok\033[0m · \033[31m%d com problema\033[0m · \033[33m%d opcionais/avisos\033[0m\n' "$OK" "$FALHA" "$OPC"
 [ "$FALHA" -eq 0 ]

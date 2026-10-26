@@ -47,6 +47,9 @@ Mostra cada função do vídeo com ✓, ✗ (com o comando que resolve) ou – (
 - **Sunshine**: streaming do PC.
 - **Tela de login da SownteeShell (greetd)**: troca o gerenciador de login atual. Para voltar: `sudo systemctl enable --force sddm` (ou o que você usava).
 - **Tema do autor nos apps** (GTK/Qt, ícones WhiteSur, cursor, fonte SF Pro).
+- **Terminal do vídeo**: Blackbox com as cores do papel de parede, fonte GeistMono, espaçamento do autor, aberto no Super+Enter e como terminal padrão das Configurações. Opcionalmente o **zsh do autor** (prompt, autocompletar, eza/bat/fzf); para voltar: `sudo chsh -s /bin/bash $USER`.
+
+Também no instalador: cursor Dark_Cursor no Niri, nos apps GTK e nos apps X11 (Steam); papéis de parede do autor em `~/Imagens/Wallpapers`; e geração das cores na primeira instalação, para GTK, Qt/Kvantum e o terminal já abrirem com o tema.
 
 ## Depois de instalar
 
