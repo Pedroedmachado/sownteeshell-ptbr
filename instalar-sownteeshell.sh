@@ -272,6 +272,7 @@ if [ "$Q_TEMA" -eq 1 ]; then
     G3="$HOME/.config/gtk-3.0/settings.ini"
     [ -f "$G3" ] && [ ! -L "$G3" ] && [ ! -f "$G3.antes-sownteeshell" ] && cp "$G3" "$G3.antes-sownteeshell"
     cp -f "$DOTF_DIR/.config/gtk-3.0/settings.ini" "$G3"
+    sed -i '/^gtk-decoration-layout=/d' "$G3"; sed -i '/^\[Settings\]/a gtk-decoration-layout=:maximize,close' "$G3"
     ligar "$DOTF_DIR/.config/gtk-3.0/gtk.css" "$HOME/.config/gtk-3.0/gtk.css"
     ligar "$DOTF_DIR/.config/gtk-4.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"
     ligar "$DOTF_DIR/.config/gtk-4.0/gtk.css" "$HOME/.config/gtk-4.0/gtk.css"
@@ -288,7 +289,8 @@ if [ "$Q_TEMA" -eq 1 ]; then
     if fc-list | grep -qi 'SF Pro Text'; then
         gsettings set org.gnome.desktop.interface font-name 'SF Pro Text 10.5' || true
     fi
-    gsettings set org.gnome.desktop.wm.preferences button-layout ':minimize,maximize,close' || true
+    # O Niri não tem "minimizar": o botão não faria nada. Fica só maximizar e fechar.
+    gsettings set org.gnome.desktop.wm.preferences button-layout ':maximize,close' || true
     # Cursor também nos apps X11 (Steam etc.)
     mkdir -p "$HOME/.icons/default"
     printf '[Icon Theme]\nInherits=Dark_Cursor\n' > "$HOME/.icons/default/index.theme"
@@ -453,6 +455,8 @@ if [ "$Q_GREET" -eq 1 ]; then
     sudo test -f /etc/greetd/config.toml && ! sudo test -f /etc/greetd/config.toml.antes-sownteeshell && \
         sudo cp /etc/greetd/config.toml /etc/greetd/config.toml.antes-sownteeshell
     sudo "$SHELL_DIR/scripts/system/deploy-greeter.sh" --privileged "$USER"
+    # O cage do autor fica bugado na NVIDIA; a tela de login roda num Niri mínimo.
+    "$KIT/configurar-greeter.sh" || erro "Não troquei o cage pelo Niri na tela de login (veja acima)."
     TD=/var/lib/sownteeshell/greeter
     sudo test -f "$TD/settings.json" || printf '%s\n' '{"defaultSession":"niri","rememberLastSession":false}' \
         | sudo install -o "$USER" -g greeter -m 0640 /dev/stdin "$TD/settings.json"

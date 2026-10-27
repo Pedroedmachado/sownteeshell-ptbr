@@ -50,6 +50,7 @@ if [ "${1:-}" != "--sem-build" ]; then
         echo "[*] Atualizando a tela de login (pede a senha)..."
         sudo install -D -m 0755 backend/rust/core-daemon/target/release/sownteeshell-core /usr/lib/sownteeshell/sownteeshell-core
         sudo scripts/system/deploy-greeter.sh --privileged "$USER" >/dev/null
+        "$KIT/configurar-greeter.sh" >/dev/null || echo "[!] Rode ./configurar-greeter.sh para a tela de login usar o Niri."
     fi
     echo "[ok] Atualizado. Recarregue o shell com Ctrl+Alt+R."
 fi
