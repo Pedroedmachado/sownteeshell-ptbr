@@ -192,9 +192,9 @@ fi
 PROTEGER=()
 for p in qt6-base qt6-declarative qt6-svg qt6-wayland qt6-multimedia qt6-multimedia-ffmpeg qt6-5compat \
     qt6-imageformats qt6-positioning qt6-connectivity xdg-desktop-portal-gnome xdg-desktop-portal-gtk gnome-keyring; do
-    instalado "$p" && PROTEGER+=("$p")
+    real="$(pacman -Qq "$p" 2>/dev/null | head -1)" && [ -n "$real" ] && PROTEGER+=("$real")
 done
-[ "${#PROTEGER[@]}" -gt 0 ] && { sudo pacman -D --asexplicit "${PROTEGER[@]}" >/dev/null || true; }
+for p in "${PROTEGER[@]}"; do sudo pacman -D --asexplicit "$p" >/dev/null 2>&1 || true; done
 
 # ------------------------------------------------------------------ 2. código
 mkdir -p "$DOT"

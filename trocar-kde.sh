@@ -111,8 +111,9 @@ else
         upower power-profiles-daemon bluez bluez-utils ffmpeg mesa vulkan-icd-loader egl-wayland
         nvidia nvidia-dkms nvidia-open nvidia-open-dkms nvidia-utils lib32-nvidia-utils libva-nvidia-driver
         noto-fonts noto-fonts-emoji ttf-dejavu sudo base-devel git)
-    P=(); for p in "${PROTEGER[@]}"; do instalado "$p" && P+=("$p"); done
-    sudo pacman -D --asexplicit "${P[@]}" >/dev/null
+    # `pacman -Qq nome` também acha quem "provê" o nome (qt6ct -> qt6ct-kde); o -D precisa do nome real.
+    mapfile -t P < <(for p in "${PROTEGER[@]}"; do pacman -Qq "$p" 2>/dev/null; done | sort -u)
+    for p in "${P[@]}"; do sudo pacman -D --asexplicit "$p" >/dev/null 2>&1 || true; done
 
     echo
     azul "Vão sair ${#REMOVER[@]} pacotes do KDE (e as dependências que só eles usavam):"
