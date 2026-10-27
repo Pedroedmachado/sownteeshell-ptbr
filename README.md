@@ -58,7 +58,17 @@ Mostra cada função do vídeo com ✓, ✗ (com o comando que resolve) ou – (
 - **Tailscale** e **Cloudflare WARP**: botões dos controles rápidos. No Tailscale, rode `sudo tailscale up` uma vez.
 - **Desbloqueio por rosto (Howdy)**: só aparece se houver webcam. Compila por um tempo.
 - **Sunshine**: streaming do PC.
-- **Tela de login da SownteeShell (greetd)**: troca o gerenciador de login atual. Para voltar: `sudo systemctl enable --force sddm` (ou o que você usava).
+- **Tela de login da SownteeShell (greetd)**: troca o gerenciador de login atual. Roda num Niri mínimo (o `cage` do autor fica bugado na NVIDIA), com o mesmo teclado do sistema. Para voltar: `sudo systemctl enable --force sddm` (ou o que você usava).
+
+  Para trocar só a tela de login depois, sem reinstalar nada:
+
+  ```bash
+  ./configurar-greeter.sh           # SownteeShell no Niri
+  ./configurar-greeter.sh --cage    # SownteeShell no cage (igual ao autor)
+  ./configurar-greeter.sh --texto   # texto (tuigreet)
+  ```
+
+  As cores e o fundo da tela de login aparecem depois de escolher um papel de parede (Super+M).
 - **Tema do autor nos apps** (GTK/Qt, ícones WhiteSur, cursor, fonte SF Pro).
 - **Terminal do vídeo**: Blackbox com as cores do papel de parede, fonte GeistMono, espaçamento do autor, aberto no Super+Enter e como terminal padrão das Configurações. Opcionalmente o **zsh do autor** (prompt, autocompletar, eza/bat/fzf); para voltar: `sudo chsh -s /bin/bash $USER`.
 
@@ -118,6 +128,7 @@ Puxa a versão nova do autor, reaplica a tradução, recompila os serviços (e a
 | `instalar-sownteeshell.sh` | Instala ou conserta tudo |
 | `verificar-sownteeshell.sh` | Confere função por função |
 | `atualizar-sownteeshell.sh` | Atualiza e reaplica o pt-BR |
+| `configurar-greeter.sh` | Escolhe a tela de login: SownteeShell no Niri, no cage ou texto (com backup e `niri validate`) |
 | `configurar-niri.py` | Liga `~/.config/niri` ao dotf e faz os ajustes de desktop (com backup e `niri validate`) |
 | `aplicar-ptbr.py` | Tradução e ajustes regionais |
 | `traducao-ptbr.json` | As frases traduzidas |
