@@ -2,6 +2,19 @@
 
 Kit para deixar o Arch igual ao vídeo da [SownteeShell](https://github.com/sownteedev/dotfiles/tree/sownteeshell), traduzida para português e ajustada para PC de mesa (NVIDIA, sem bateria, monitor externo, teclado ABNT2).
 
+## Trocar o KDE Plasma pela SownteeShell
+
+Se o Arch está com o KDE Plasma, este comando faz a troca completa (pode rodar de dentro do próprio Plasma):
+
+```bash
+git clone https://github.com/Pedroedmachado/sownteeshell-ptbr.git ~/Dotfiles/sownteeshell-ptbr 2>/dev/null || git -C ~/Dotfiles/sownteeshell-ptbr pull
+~/Dotfiles/sownteeshell-ptbr/trocar-kde.sh
+```
+
+Na ordem: instala o Niri, remove o Plasma, o SDDM e (se quiser) os apps do KDE sem levar junto o que a SownteeShell usa, guarda as configs do KDE em `~/.kde-backup-<data>`, roda o instalador abaixo e põe a tela de login (a da SownteeShell ou a de texto `tuigreet`). Na NVIDIA também liga o `modeset`. No fim, reinicie.
+
+Se a tela de login não abrir: **Ctrl+Alt+F2**, entre com usuário e senha e rode `~/Dotfiles/sownteeshell-ptbr/trocar-kde.sh --so-login-texto` (ou só `niri-session`).
+
 ## Instalar ou consertar
 
 Dentro da sessão do Niri, num terminal:
@@ -101,6 +114,7 @@ Puxa a versão nova do autor, reaplica a tradução, recompila os serviços (e a
 
 | Arquivo | Para quê |
 |---|---|
+| `trocar-kde.sh` | Remove o KDE Plasma e instala a SownteeShell no lugar |
 | `instalar-sownteeshell.sh` | Instala ou conserta tudo |
 | `verificar-sownteeshell.sh` | Confere função por função |
 | `atualizar-sownteeshell.sh` | Atualiza e reaplica o pt-BR |

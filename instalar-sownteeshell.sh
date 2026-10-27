@@ -7,6 +7,7 @@
 #   ./instalar-sownteeshell.sh             pergunta antes de cada parte opcional
 #   ./instalar-sownteeshell.sh --sim       responde "sim" para tudo (inclusive greeter)
 #   ./instalar-sownteeshell.sh --sem-niri  não mexe na config do Niri
+#   ./instalar-sownteeshell.sh --greeter | --sem-greeter   decide a tela de login sem perguntar
 #
 # No fim roda ./verificar-sownteeshell.sh, que mostra função por função o que está ok.
 
@@ -20,10 +21,13 @@ REPO="https://github.com/sownteedev/dotfiles.git"
 WALLS="$HOME/Imagens/Wallpapers"
 SIM_TUDO=0
 SEM_NIRI=0
+GREETER_ARG=""   # "" = pergunta; 1 = instala; 0 = não instala
 for a in "$@"; do
     case "$a" in
         --sim) SIM_TUDO=1 ;;
         --sem-niri) SEM_NIRI=1 ;;
+        --greeter) GREETER_ARG=1 ;;
+        --sem-greeter) GREETER_ARG=0 ;;
         *) echo "Opção desconhecida: $a"; exit 2 ;;
     esac
 done
@@ -89,7 +93,9 @@ if [ "$CAMERA" -eq 1 ]; then
     pergunta "  Desbloqueio por rosto (Howdy) com a webcam? Compila por ~15 min." N && Q_HOWDY=1
 fi
 pergunta "  Sunshine (streaming do PC para outros aparelhos)?" N && Q_SUN=1
-if [ "$SIM_TUDO" -eq 1 ]; then
+if [ -n "$GREETER_ARG" ]; then
+    Q_GREET="$GREETER_ARG"
+elif [ "$SIM_TUDO" -eq 1 ]; then
     azul "  (--sim não troca a tela de login; rode sem --sim para escolher)"
 else
     pergunta "  Tela de login da SownteeShell (greetd) no lugar da atual? Troca o gerenciador de login." N && Q_GREET=1
