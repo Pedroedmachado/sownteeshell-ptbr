@@ -50,7 +50,7 @@ compilar_paru() {
     azul "[*] Compilando o paru para a versão atual do pacman (uns 5 minutos)..."
     sudo pacman -Syu --needed --noconfirm git base-devel rust
     rm -rf /tmp/paru-src && git clone https://aur.archlinux.org/paru.git /tmp/paru-src
-    pacman -Qq paru-bin >/dev/null 2>&1 && sudo pacman -Rdd --noconfirm paru-bin
+    for v in paru-bin paru-bin-debug; do pacman -Qq "$v" >/dev/null 2>&1 && sudo pacman -Rdd --noconfirm "$v"; done
     (cd /tmp/paru-src && makepkg -si --noconfirm)
 }
 AUR=""
