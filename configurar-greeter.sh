@@ -14,6 +14,13 @@
 #   ./configurar-greeter.sh           tela da SownteeShell no Niri
 #   ./configurar-greeter.sh --cage    tela da SownteeShell no cage (config do autor)
 #   ./configurar-greeter.sh --texto   tela de texto (tuigreet), a mais garantida na NVIDIA
+#   ./configurar-greeter.sh --monitor DP-3      escolhe o monitor da tela de senha no Niri
+#   ./configurar-greeter.sh --todos-monitores   deixa todos ligados (o cartão vai no primeiro)
+#
+# Com mais de um monitor, a tela de senha do autor só aceita digitação no primeiro que o
+# compositor anuncia, que nem sempre é o principal. Por isso, no Niri, só o monitor
+# principal fica ligado na tela de login: o mais à esquerda na sua sessão atual do Niri,
+# no mesmo modo (resolução e Hz). Rode o script de dentro da sessão para ele achar.
 
 set -euo pipefail
 
@@ -31,12 +38,17 @@ erro()  { printf '\033[31m[!] %s\033[0m\n' "$*" >&2; }
 [ "$(id -u)" -eq 0 ] && { erro "Rode como seu usuário, não como root."; exit 1; }
 
 MODO=niri
-case "${1:-}" in
-    "") ;;
-    --cage|--desfazer) MODO=cage ;;
-    --texto) MODO=texto ;;
-    *) erro "Opção desconhecida: $1 (use --cage ou --texto)"; exit 1 ;;
-esac
+MONITOR=""        # "" = automático; "*" = todos
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --cage|--desfazer) MODO=cage ;;
+        --texto) MODO=texto ;;
+        --monitor) MONITOR="${2:-}"; shift; [ -n "$MONITOR" ] || { erro "Faltou o nome: --monitor DP-3"; exit 1; } ;;
+        --todos-monitores) MONITOR="*" ;;
+        *) erro "Opção desconhecida: $1 (use --cage, --texto, --monitor NOME ou --todos-monitores)"; exit 1 ;;
+    esac
+    shift
+done
 
 # Grava $1 em $CONF, guardando a config anterior se for diferente.
 gravar_conf() {
@@ -87,6 +99,39 @@ if [ "$MODO" = niri ]; then
     [ -n "$VARIANTE" ] && XKB_EXTRA+=$'\n'"            variant \"$VARIANTE\""
     [ -n "$OPCOES" ] && XKB_EXTRA+=$'\n'"            options \"$OPCOES\""
 
+    # Monitores: só o principal fica ligado (veja o topo do arquivo).
+    MONITORES=""
+    SAIDAS=""
+    if [ "$MONITOR" != "*" ] && command -v jq >/dev/null; then
+        SAIDAS="$(niri msg -j outputs 2>/dev/null | jq -r '.[] | select(.logical != null)
+            | [.name, .logical.x, .logical.y, (.modes[.current_mode] // {} | "\(.width)x\(.height)@\(.refresh_rate)")] | @tsv' 2>/dev/null || true)"
+    fi
+    if [ "$MONITOR" = "*" ]; then
+        azul "[*] Tela de login em todos os monitores."
+    elif [ -z "$SAIDAS" ]; then
+        [ -n "$MONITOR" ] && { erro "Rode de dentro da sessão do Niri para usar --monitor."; exit 1; }
+        azul "[*] Fora da sessão do Niri: não sei qual é o monitor principal; deixo todos ligados."
+    elif [ "$(wc -l <<<"$SAIDAS")" -gt 1 ] || [ -n "$MONITOR" ]; then
+        if [ -z "$MONITOR" ]; then
+            MONITOR="$(sort -t$'\t' -k2,2n -k3,3n <<<"$SAIDAS" | head -n1 | cut -f1)"
+        elif ! cut -f1 <<<"$SAIDAS" | grep -qxF "$MONITOR"; then
+            erro "Monitor $MONITOR não existe. Os que existem: $(cut -f1 <<<"$SAIDAS" | paste -sd' ')"
+            exit 1
+        fi
+        while IFS=$'\t' read -r nome _ _ modo; do
+            if [ "$nome" = "$MONITOR" ]; then
+                # refresh_rate vem em mHz: 144001 -> 144.001
+                hz="${modo##*@}"; modo="${modo%@*}"
+                MONITORES+="output \"$nome\" {"$'\n'
+                [[ "$hz" =~ ^[0-9]+$ ]] && MONITORES+="    mode \"$modo@$((hz / 1000)).$(printf '%03d' $((hz % 1000)))\""$'\n'
+                MONITORES+="    position x=0 y=0"$'\n'"    focus-at-startup"$'\n'"}"$'\n'
+            else
+                MONITORES+="output \"$nome\" { off; }"$'\n'
+            fi
+        done <<<"$SAIDAS"
+        azul "[*] Tela de senha só no monitor $MONITOR (os outros ficam desligados no login)."
+    fi
+
     azul "[*] Tela de login no Niri (teclado: $LAYOUT${VARIANTE:+ / $VARIANTE})..."
     TMP="$(mktemp)"
     cat >"$TMP" <<KDL
@@ -103,6 +148,7 @@ input {
     touchpad { tap; }
 }
 
+$MONITORES
 hotkey-overlay { skip-at-startup; }
 prefer-no-csd
 screenshot-path null
@@ -126,8 +172,9 @@ window-rule {
 }
 
 // Abre a tela de login; quando ela termina (login feito), fecha este Niri
-// para o greetd iniciar a sua sessão.
-spawn-sh-at-startup "quickshell --no-color --path $GREETER_DIR; niri msg action quit --skip-confirmation"
+// para o greetd iniciar a sua sessão. A saída vai para o journal:
+//   journalctl -b -t sownteeshell-greeter-qs
+spawn-sh-at-startup "quickshell --no-color --path $GREETER_DIR 2>&1 | systemd-cat -t sownteeshell-greeter-qs; niri msg action quit --skip-confirmation"
 KDL
 
     if ! niri validate -c "$TMP" >/dev/null 2>&1; then
