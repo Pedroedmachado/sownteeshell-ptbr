@@ -45,13 +45,20 @@ tem() { command -v "$1" >/dev/null 2>&1; }
 [ "$(id -u)" -eq 0 ] && { erro "Rode como seu usuário, não como root."; exit 1; }
 [ -f /etc/arch-release ] || { erro "Esse script é para Arch Linux."; exit 1; }
 
-if tem paru; then AUR=paru
-elif tem yay; then AUR=yay
+# O paru/yay precisa funcionar com o pacman atual (um paru-bin antigo quebra com "libalpm.so.N").
+compilar_paru() {
+    azul "[*] Compilando o paru para a versão atual do pacman (uns 5 minutos)..."
+    sudo pacman -Syu --needed --noconfirm git base-devel rust
+    rm -rf /tmp/paru-src && git clone https://aur.archlinux.org/paru.git /tmp/paru-src
+    pacman -Qq paru-bin >/dev/null 2>&1 && sudo pacman -Rdd --noconfirm paru-bin
+    (cd /tmp/paru-src && makepkg -si --noconfirm)
+}
+AUR=""
+if tem paru && paru --version >/dev/null 2>&1; then AUR=paru
+elif tem yay && yay --version >/dev/null 2>&1; then AUR=yay
 else
-    azul "[*] Instalando o paru (helper do AUR)..."
-    sudo pacman -S --needed --noconfirm git base-devel
-    rm -rf /tmp/paru-bin && git clone https://aur.archlinux.org/paru-bin.git /tmp/paru-bin
-    (cd /tmp/paru-bin && makepkg -si --noconfirm)
+    compilar_paru
+    paru --version >/dev/null 2>&1 || { erro "Não consegui instalar um paru funcionando."; exit 1; }
     AUR=paru
 fi
 azul "[*] Usando $AUR"
@@ -155,7 +162,7 @@ fi
 FALTANDO=()
 for p in "${PACOTES[@]}"; do
     instalado "$p" && continue
-    if "$AUR" -Si "$p" >/dev/null 2>&1; then FALTANDO+=("$p")
+    if pacman -Si "$p" >/dev/null 2>&1 || "$AUR" -Si "$p" >/dev/null 2>&1; then FALTANDO+=("$p")
     else erro "Pacote '$p' não existe nos repositórios/AUR; pulando (o verificador mostra o que ficou faltando)."; fi
 done
 if [ "${#FALTANDO[@]}" -gt 0 ]; then
