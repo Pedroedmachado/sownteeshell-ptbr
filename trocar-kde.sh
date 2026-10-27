@@ -77,7 +77,7 @@ sudo pacman -S --needed --noconfirm niri xwayland-satellite xdg-desktop-portal-g
 azul "[2/5] Procurando os pacotes do KDE Plasma..."
 mapfile -t TODOS < <(pacman -Qq)
 REMOVER=()
-add() { for p in "$@"; do instalado "$p" && REMOVER+=("$p"); done; }
+add() { local p; for p in "$@"; do if instalado "$p"; then REMOVER+=("$p"); fi; done; return 0; }
 
 # grupos e metapacotes
 mapfile -t G_PLASMA < <(pacman -Qgq plasma 2>/dev/null || true)
@@ -98,7 +98,7 @@ if [ "$MANTER_APPS" -eq 0 ]; then
     add kde-applications-meta "${G_APPS[@]}" dolphin konsole kate kwrite okular ark gwenview elisa kcalc filelight \
         partitionmanager kdialog khelpcenter konqueror kfind yakuake kolourpaint skanpage haruna
 fi
-mapfile -t REMOVER < <(printf '%s\n' "${REMOVER[@]}" | sort -u)
+mapfile -t REMOVER < <(printf '%s\n' "${REMOVER[@]}" | grep -v '^$' | sort -u)
 
 if [ "${#REMOVER[@]}" -eq 0 ]; then
     verde "[ok] Não achei pacotes do KDE Plasma; pulando a remoção."
