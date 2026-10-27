@@ -68,6 +68,10 @@ Mostra cada função do vídeo com ✓, ✗ (com o comando que resolve) ou – (
   ./configurar-greeter.sh --texto   # texto (tuigreet)
   ```
 
+  Com mais de um monitor, a tela de senha fica só no principal (o mais à esquerda na sua sessão do Niri, no mesmo modo e Hz) e os outros ficam desligados durante o login. Rode o script de dentro da sessão para ele achar o monitor. Para escolher outro: `./configurar-greeter.sh --monitor HDMI-A-2` (nomes em `niri msg outputs`); para ligar todos: `--todos-monitores`.
+
+  Se a tela de login der problema, o log dela fica em `journalctl -b -t sownteeshell-greeter-qs`.
+
   As cores e o fundo da tela de login aparecem depois de escolher um papel de parede (Super+M).
 - **Tema do autor nos apps** (GTK/Qt, ícones WhiteSur, cursor, fonte SF Pro).
 - **Terminal do vídeo**: Blackbox com as cores do papel de parede, fonte GeistMono, espaçamento do autor, aberto no Super+Enter e como terminal padrão das Configurações. Opcionalmente o **zsh do autor** (prompt, autocompletar, eza/bat/fzf); para voltar: `sudo chsh -s /bin/bash $USER`.
